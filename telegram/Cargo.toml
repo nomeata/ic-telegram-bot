@@ -1,0 +1,22 @@
+[package]
+name = "telegram"
+version = "0.1.0"
+authors = ["Joachim Breitner <mail@joachim-breitner.de>"]
+edition = "2018"
+
+[profile.release]
+lto = true
+opt-level = 'z'
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+candid = "0.6.10"
+ic-types = "0.1.2"
+ic-cdk = "0.2.0"
+ic-cdk-macros = "0.2.0"
+serde = "1.0.116"
+serde_json = "1.0.59"
+telegram-bot-raw = "0.8.0"

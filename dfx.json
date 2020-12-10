@@ -1,0 +1,24 @@
+{
+  "canisters": {
+    "telegram": {
+      "build": "telegram/build.sh",
+      "candid": "telegram/src/lib.did",
+      "type": "custom",
+      "wasm": "telegram/target/wasm32-unknown-unknown/release/telegram-opt.wasm"
+    }
+  },
+  "dfx": "0.6.16",
+  "networks": {
+    "ic": {
+      "providers": [
+        "https://gw.dfinity.network"
+      ],
+      "type": "persistent"
+    },
+    "local": {
+      "bind": "0.0.0.0:8080",
+      "type": "ephemeral"
+    }
+  },
+  "version": 1
+}

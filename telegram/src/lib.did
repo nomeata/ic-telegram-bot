@@ -1,0 +1,16 @@
+type request = record {
+  method : text;
+  headers : vec record {blob; blob};
+  uri : text;
+  body : blob;
+};
+type response = record {
+  status : nat16;
+  headers : vec record {blob; blob};
+  body : blob;
+  upgrade : bool;
+};
+service : {
+  http_query : (request) -> (response);
+  http_update : (request) -> (response);
+}
