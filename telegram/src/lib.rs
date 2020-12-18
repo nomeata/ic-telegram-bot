@@ -30,19 +30,22 @@ fn get_info() -> String {
     format!("This is a telgram bot on the Internet Computer!\nMy canister id: {}\nLocal time is {}ns.\nMy cycle balance is {}\nVisit my homepages:\nhttp://t.me/InternetComputerBot\nhttps://{}.ic.nomeata.de/\nhttps://github.com/nomeata/ic-telegram-bot.", id(), time(), canister_balance(), id())
 }
 
-static mut JOKE: Option<String> = None;
-
-fn get_joke() -> String {
-    unsafe {
-        match &JOKE {
-            None => "What does Mr. Williams reign over? His dom-minions!".to_string(),
-            Some(joke) => joke.clone(),
-        }
-    }
+#[macro_use]
+extern crate lazy_static;
+lazy_static! {
+    static ref JOKES: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(vec![
+        "What does Mr. Williams reign over? His dom-minions!".to_string()
+    ]);
 }
-
-fn set_joke(new_joke: String) {
-    unsafe { JOKE = Some(new_joke) }
+fn add_joke(new_joke: String) {
+    JOKES.lock().unwrap().push(new_joke);
+}
+fn get_random_joke() -> (String, usize, usize) {
+    let jokes = JOKES.lock().unwrap();
+    let n = jokes.len();
+    let idx = time() as usize % jokes.len();
+    let joke = jokes[idx].clone();
+    (joke, idx + 1, n)
 }
 
 // Main entry points and dispatchers
@@ -57,7 +60,6 @@ fn http_query(req: HTTPQueryRequest) -> HTTPQueryResult {
     dispatch(req)
 }
 
-
 fn dispatch(req: HTTPQueryRequest) -> HTTPQueryResult {
     let uri = req.uri.clone();
     match uri.strip_prefix("/webhook/") {
@@ -71,7 +73,6 @@ fn dispatch(req: HTTPQueryRequest) -> HTTPQueryResult {
         }
     }
 }
-
 
 // A common handlers
 
@@ -117,7 +118,7 @@ fn handle_telegram(_token: &str, req: HTTPQueryRequest) -> HTTPQueryResult {
             status: 500,
             headers: vec![],
             body: format!("{}", err).as_bytes().to_vec(),
-            upgrade: false
+            upgrade: false,
         },
         Ok(update) => match update.kind {
             UpdateKind::Message(msg) => match msg.kind {
@@ -158,18 +159,21 @@ fn handle_message(chat: MessageChat, text: String) -> HTTPQueryResult {
             chat,
             "Hello! I am a Telegram Bot in a canister. Try /joke, /info".to_string(),
         ),
-        "/joke" => send_message(
+        "/joke" => {
+            let (joke, idx, n) = get_random_joke();
+            send_message(
             chat,
             format!(
-                "{}\n(Got a better one? Tell me about it, with /telljoke …!)",
-                get_joke()
+                "{}\n(This was joke {} of {}. Got a better one? Tell me about it, with /telljoke …!)",
+                joke, idx, n
             ),
-        ),
+        )
+        }
         "/telljoke" => send_message(chat, "Put the joke after /telljoke!".to_string()),
         "/info" => send_message(chat, get_info()),
         _ => match text.strip_prefix("/telljoke ") {
             Some(joke) => {
-                set_joke(joke.to_string());
+                add_joke(joke.to_string());
                 let mut resp = send_message(chat, "Ha! Ha! Duly noted.".to_string());
                 resp.upgrade = true;
                 resp
@@ -178,4 +182,3 @@ fn handle_message(chat: MessageChat, text: String) -> HTTPQueryResult {
         },
     }
 }
-
