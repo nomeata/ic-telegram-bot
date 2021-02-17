@@ -74,6 +74,16 @@ fn dispatch(req: HTTPQueryRequest) -> HTTPQueryResult {
     }
 }
 
+// Lets take donations
+// NB: We are not returning the expected candid here; lets see what happens.
+#[update]
+fn wallet_receive() -> () {
+    let amount = ic_cdk::api::call::msg_cycles_available();
+    if amount > 0 {
+        ic_cdk::api::call::msg_cycles_accept(amount);
+    }
+}
+
 // A common handlers
 
 fn ok200() -> HTTPQueryResult {
