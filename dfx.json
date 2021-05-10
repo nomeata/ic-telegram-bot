@@ -7,11 +7,10 @@
       "wasm": "telegram/target/wasm32-unknown-unknown/release/telegram-opt.wasm"
     }
   },
-  "dfx": "0.6.16",
   "networks": {
     "ic": {
       "providers": [
-        "https://gw.dfinity.network"
+        "https://ic0.app"
       ],
       "type": "persistent"
     },
