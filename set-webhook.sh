@@ -13,4 +13,4 @@ if [ -z "$token" ]; then
   exit 1
 fi
 
-curl "https://api.telegram.org/bot$token/setWebhook?url=https://$canister_id.ic.nomeata.de/webhook/$token"
+curl "https://api.telegram.org/bot$token/setWebhook?url=https://$canister_id.raw.ic0.app/webhook/$token"

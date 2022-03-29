@@ -3,31 +3,48 @@ use ic_cdk::api::*;
 use ic_cdk_macros::*;
 
 use ic_cdk::export::candid::CandidType;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 
 // The HTTP Gateway interfaces
-// See https://github.com/nomeata/ic-http-lambda
+// Taken from https://docs.rs/ic-utils/0.14.0/src/ic_utils/interfaces/http_request.rs.html
+// and simplified (no streaming_strategy needed).
 
+/// A key-value pair for a HTTP header.
 #[derive(CandidType, Deserialize)]
-struct HTTPQueryRequest {
-    method: String,
-    headers: Vec<(Vec<u8>, Vec<u8>)>,
-    uri: String,
-    body: Vec<u8>,
+pub struct HeaderField(pub String, pub String);
+
+/// The important components of an HTTP request.
+#[derive(CandidType, Deserialize)]
+pub struct HttpRequest {
+    /// The HTTP method string.
+    pub method: String,
+    /// The URL that was visited.
+    pub url: String,
+    /// The request headers.
+    pub headers: Vec<HeaderField>,
+    /// The request body.
+    // #[serde(with = "serde_bytes")]
+    pub body: Vec<u8>,
 }
 
-#[derive(CandidType, Serialize)]
-struct HTTPQueryResult {
-    status: u16,
-    headers: Vec<(Vec<u8>, Vec<u8>)>,
-    body: Vec<u8>,
-    upgrade: bool,
+/// A HTTP response.
+#[derive(CandidType)]
+pub struct HttpResponse {
+    /// The HTTP status code.
+    pub status_code: u16,
+    /// The response header map.
+    pub headers: Vec<HeaderField>,
+    /// The response body.
+    // #[serde(with = "serde_bytes")]
+    pub body: Vec<u8>,
+    /// Whether the query call should be upgraded to an update call.
+    pub upgrade: Option<bool>,
 }
 
 // Some application logic
 
 fn get_info() -> String {
-    format!("This is a telgram bot on the Internet Computer!\nMy canister id: {}\nLocal time is {}ns.\nMy cycle balance is {}\nVisit my homepages:\nhttp://t.me/InternetComputerBot\nhttps://{}.ic.nomeata.de/\nhttps://github.com/nomeata/ic-telegram-bot.", id(), time(), canister_balance(), id())
+    format!("This is a Telegram bot on the Internet Computer!\nMy canister id: {}\nLocal time is {}ns.\nMy cycle balance is {}\nVisit my homepages:\nhttps://t.me/InternetComputerBot\nhttps://{}.raw.ic0.app/\nhttps://github.com/nomeata/ic-telegram-bot", id(), time(), canister_balance(), id())
 }
 
 #[macro_use]
@@ -51,21 +68,21 @@ fn get_random_joke() -> (String, usize, usize) {
 // Main entry points and dispatchers
 
 #[update]
-fn http_update(req: HTTPQueryRequest) -> HTTPQueryResult {
+fn http_request_update(req: HttpRequest) -> HttpResponse {
     dispatch(req)
 }
 
 #[query]
-fn http_query(req: HTTPQueryRequest) -> HTTPQueryResult {
+fn http_request(req: HttpRequest) -> HttpResponse {
     dispatch(req)
 }
 
-fn dispatch(req: HTTPQueryRequest) -> HTTPQueryResult {
-    let uri = req.uri.clone();
+fn dispatch(req: HttpRequest) -> HttpResponse {
+    let uri = req.url.clone();
     match uri.strip_prefix("/webhook/") {
         Some(token) => handle_telegram(token, req),
         None => {
-            if req.uri == "/" {
+            if req.url == "/" {
                 index(req)
             } else {
                 err404(req)
@@ -86,34 +103,34 @@ fn wallet_receive() -> () {
 
 // A common handlers
 
-fn ok200() -> HTTPQueryResult {
-    HTTPQueryResult {
-        status: 200,
-        headers: vec![(b"content-type".to_vec(), b"text/html".to_vec())],
+fn ok200() -> HttpResponse {
+    HttpResponse {
+        status_code: 200,
+        headers: vec![HeaderField(String::from("content-type"), String::from("text/html"))],
         body: "Nothing to do".as_bytes().to_vec(),
-        upgrade: false,
+        upgrade: Some(false),
     }
 }
 
-fn index(_req: HTTPQueryRequest) -> HTTPQueryResult {
-    HTTPQueryResult {
-        status: 200,
-        headers: vec![(b"content-type".to_vec(), b"text/plain".to_vec())],
+fn index(_req: HttpRequest) -> HttpResponse {
+    HttpResponse {
+        status_code: 200,
+        headers: vec![HeaderField(String::from("content-type"), String::from("text/plain"))],
         body: get_info().as_bytes().to_vec(),
-        upgrade: false,
+        upgrade: Some(false),
     }
 }
-fn err404(req: HTTPQueryRequest) -> HTTPQueryResult {
-    HTTPQueryResult {
-        status: 404,
+fn err404(req: HttpRequest) -> HttpResponse {
+    HttpResponse {
+        status_code: 404,
         headers: vec![],
         body: format!(
             "Nothing found at {}\n(but still, you reached the internet computer!)",
-            req.uri
+            req.url
         )
         .as_bytes()
         .to_vec(),
-        upgrade: false,
+        upgrade: Some(false),
     }
 }
 
@@ -122,13 +139,13 @@ fn err404(req: HTTPQueryRequest) -> HTTPQueryResult {
 use serde_json::Value;
 use telegram_bot_raw::{MessageChat, MessageKind, SendMessage, Update, UpdateKind};
 
-fn handle_telegram(_token: &str, req: HTTPQueryRequest) -> HTTPQueryResult {
+fn handle_telegram(_token: &str, req: HttpRequest) -> HttpResponse {
     match serde_json::from_slice::<Update>(&req.body) {
-        Err(err) => HTTPQueryResult {
-            status: 500,
+        Err(err) => HttpResponse {
+            status_code: 500,
             headers: vec![],
             body: format!("{}", err).as_bytes().to_vec(),
-            upgrade: false,
+            upgrade: Some(false),
         },
         Ok(update) => match update.kind {
             UpdateKind::Message(msg) => match msg.kind {
@@ -149,21 +166,21 @@ fn add_method(value: &mut Value, method: String) {
     }
 }
 
-fn send_message(chat: MessageChat, text: String) -> HTTPQueryResult {
+fn send_message(chat: MessageChat, text: String) -> HttpResponse {
     let m = SendMessage::new(chat, text);
     let mut value = serde_json::to_value(m).unwrap();
     add_method(&mut value, "sendMessage".to_string());
-    HTTPQueryResult {
-        status: 200,
-        headers: vec![(b"content-type".to_vec(), b"application/json".to_vec())],
+    HttpResponse {
+        status_code: 200,
+        headers: vec![HeaderField(String::from("content-type"), String::from("application/json"))],
         body: serde_json::to_vec(&value).unwrap(),
-        upgrade: false,
+        upgrade: Some(false),
     }
 }
 
 // The actual handler
 
-fn handle_message(chat: MessageChat, text: String) -> HTTPQueryResult {
+fn handle_message(chat: MessageChat, text: String) -> HttpResponse {
     match text.as_str() {
         "/start" => send_message(
             chat,
@@ -185,7 +202,7 @@ fn handle_message(chat: MessageChat, text: String) -> HTTPQueryResult {
             Some(joke) => {
                 add_joke(joke.to_string());
                 let mut resp = send_message(chat, "Ha! Ha! Duly noted.".to_string());
-                resp.upgrade = true;
+                resp.upgrade = Some(true);
                 resp
             }
             _ => send_message(chat, format!("What do you mean, {}?", text)),
