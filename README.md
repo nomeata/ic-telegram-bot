@@ -6,6 +6,8 @@ Telegram bot on the Internet Computer, without any external infrastructure neede
 
 [HTTP Gateway]: https://github.com/nomeata/ic-http-lambda
 
+Try it out at <https://t.me/InternetComputerBot>!
+
 
 Historical note
 ---------------
